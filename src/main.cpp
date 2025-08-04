@@ -17,11 +17,49 @@
 #include "Shader.h"
 #include "Camera.h"
 
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <iostream>
+
+namespace fs = std::filesystem;
+
+// 1. Replace your model loading with something like this:
+
+std::unordered_map<std::string, Mesh> modelLibrary; // name -> Mesh
+std::vector<std::string> modelNames;                // ordered list of names for UI
+
+void LoadModels(const std::string& directory)
+{
+    for (const auto& entry : fs::directory_iterator(directory))
+    {
+        if (entry.is_regular_file() && entry.path().extension() == ".obj")
+        {
+            std::string name = entry.path().stem().string(); // filename without extension
+            std::cout << "Loading model: " << entry.path().string() << std::endl;
+            Mesh mesh = LoadOBJ(entry.path().string());
+            modelLibrary[name] = std::move(mesh);
+            modelNames.push_back(name);
+        }
+    }
+}
+
 int SCR_WIDTH = 1280, SCR_HEIGHT = 720;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 float blockSize = 16.0f;
 const int CHUNK_SIZE = 32;
+
+struct GameObject {
+    std::string name;
+    glm::vec3 position;
+    glm::vec3 rotation;
+    glm::vec3 scale = glm::vec3(1.0f);
+    Mesh* mesh; // pointer to shared mesh data
+};
+
+std::vector<GameObject> objects;
+
 
 void processInput(GLFWwindow* window)
 {
@@ -79,6 +117,19 @@ std::vector<GLuint64> LoadNecessaryTextures(const std::vector<std::string>& text
     return textureHandles;
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    // Update viewport
+    glViewport(0, 0, width, height);
+
+    // Retrieve camera pointer from GLFW user pointer (optional)
+    Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
+    if (cam)
+    {
+        cam->SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+    }
+}
+
 int main()
 {
     glfwInit();
@@ -103,7 +154,11 @@ int main()
 
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
-    Camera camera(SCR_WIDTH, SCR_HEIGHT, glm::vec2(0.0f, 0.0f));
+    Camera camera(SCR_WIDTH, SCR_HEIGHT, glm::vec3{ 0.0f, 10.0f, 0.0f });
+
+    glfwSetWindowUserPointer(window, &camera);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
     Shader shader("../../assets/shaders/default.vert", "../../assets/shaders/default.frag");
 
     // Setup ImGui
@@ -120,10 +175,16 @@ int main()
 
     int seed = 1;
 
-    Mesh mesh = LoadOBJ("../../assets/models/cow.obj");
-
     int worldWidth = SCR_WIDTH;
     int worldHeight = SCR_HEIGHT;
+
+    LoadModels("../../assets/models");
+    int currentModelIndex = 0;
+
+    glm::mat4 model{ 1.0f };
+    glm::vec3 rotAxis{ 0.0f, 1.0f, 0.0f };
+
+    glEnable(GL_CULL_FACE);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -133,18 +194,30 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        for (auto& obj : objects) {
+            obj.rotation.y += 45.0f * deltaTime; // Rotate 45 degrees per second
+        }
+        
         glClearColor(0.0f, 0.737f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader.use();
 
-        mesh.Draw(shader);
+        for (auto& obj : objects)
+        {
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), obj.position);
+            model = glm::rotate(model, glm::radians(obj.rotation.x), glm::vec3(1, 0, 0));
+            model = glm::rotate(model, glm::radians(obj.rotation.y), glm::vec3(0, 1, 0));
+            model = glm::rotate(model, glm::radians(obj.rotation.z), glm::vec3(0, 0, 1));
+            model = glm::scale(model, obj.scale);
+
+            shader.setMat4("model", model);
+            obj.mesh->Draw(shader);
+        }
         
         if (!io.WantCaptureMouse)
             camera.Inputs(window, deltaTime);
-        camera.Matrix(shader, "camMatrix");
-		
-        
+        camera.Matrix(60.0f, 0.001f, 1000.0f ,shader, "camMatrix");
 
         // ImGui
         ImGui_ImplOpenGL3_NewFrame();
@@ -152,10 +225,38 @@ int main()
         ImGui::NewFrame();
 
         ImGui::Begin("Debug");
-        ImGui::Text("Camera Pos: %.2f %.2f", camera.Position.x, camera.Position.y);
-        ImGui::Text("Camera: (%.1f, %.1f)", camera.Position.x, camera.Position.y);
+        ImGui::Text("Entity Count: %d", objects.size());
+        ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", camera.Position.x, camera.Position.y, camera.Position.z);
         ImGui::Checkbox("Wireframe Mode", &wires);
 		glPolygonMode(GL_FRONT_AND_BACK, wires ? GL_LINE : GL_FILL);
+        static int selectedModel = 0;
+
+        if (!modelNames.empty())
+        {
+            ImGui::Combo("Model", &selectedModel,
+                [](void* data, int idx, const char** out_text) {
+                    auto& names = *static_cast<std::vector<std::string>*>(data);
+                    *out_text = names[idx].c_str();
+                    return true;
+                },
+                &modelNames, static_cast<int>(modelNames.size()));
+            
+            if (ImGui::Button("Spawn"))
+            {
+                const std::string& name = modelNames[selectedModel];
+                GameObject obj;
+                obj.name = name;
+                obj.position = glm::vec3(0.0f);
+                obj.rotation = glm::vec3(0.0f);
+                obj.scale = glm::vec3(1.0f);
+                obj.mesh = &modelLibrary[name];
+                objects.push_back(obj);
+            }
+        }
+        else
+        {
+            ImGui::Text("No models loaded");
+        }
         ImGui::End();
 
         ImGui::Render();

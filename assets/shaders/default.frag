@@ -7,7 +7,7 @@ out vec4 FragColor;
 
 uniform vec3 lightDir = normalize(vec3(1.0, -1.0, -1.0)); // example directional light
 uniform vec3 lightColor = vec3(1.0, 1.0, 1.0);
-uniform vec3 objectColor = vec3(1.0, 0.0, 0.0); // red
+uniform vec3 objectColor = vec3(1.0, 1.0, 1.0); // red
 
 void main()
 {

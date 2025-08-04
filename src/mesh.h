@@ -45,6 +45,8 @@ public:
     vector<Texture>      textures;
     unsigned int VAO;
 
+    Mesh() = default;
+
     // constructor
     Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
     {

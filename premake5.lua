@@ -18,7 +18,7 @@ project "glfw"
     }
 
     includedirs {
-        "external/glfw/include"
+        "external/glfw/include",
     }
 
     filter "system:windows"
@@ -47,16 +47,18 @@ project "Survive"
         "external/imgui/*.cpp",
         "external/imgui/backends/imgui_impl_glfw.cpp",
         "external/imgui/backends/imgui_impl_opengl3.cpp",
-        "external/glad/src/glad.c"
+        "external/glad/src/glad.c",
+        "external/stb/stb_image.h"
     }
 
     includedirs {
         "src",
         "external/glfw/include",
         "external/glad/include",
-        "external/stb",
+        "external",
         "external/imgui",
-        "external/imgui/backends"
+        "external/imgui/backends",
+        "external/glm"
     }
 
     links {

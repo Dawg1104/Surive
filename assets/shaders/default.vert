@@ -5,13 +5,14 @@ layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoords;
 
 uniform mat4 camMatrix;
+uniform mat4 model;
 
-out vec3 Normal;  // pass to fragment shader
-out vec3 FragPos; // optional: fragment position in world space for lighting
+out vec3 Normal;
+out vec3 FragPos;
 
 void main()
 {
-    gl_Position = camMatrix * vec4(aPos, 1.0);
-    Normal = aNormal; // pass the normal
-    FragPos = aPos;   // if model matrix is identity, aPos is world pos
+    FragPos = vec3(model * vec4(aPos, 1.0)); // world-space position
+    Normal = mat3(transpose(inverse(model))) * aNormal; // correct normal transform
+    gl_Position = camMatrix * vec4(FragPos, 1.0);
 }

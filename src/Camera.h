@@ -1,26 +1,46 @@
 #ifndef CAMERA_CLASS_H
 #define CAMERA_CLASS_H
 
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include<glad/glad.h>
+#include<GLFW/glfw3.h>
+#include<glm/glm.hpp>
+#include<glm/gtc/matrix_transform.hpp>
+#include<glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include<glm/gtx/rotate_vector.hpp>
+#include<glm/gtx/vector_angle.hpp>
 
-#include "Shader.h"
+#include"Shader.h"
 
 class Camera
 {
 public:
-    glm::vec2 Position;
-    int width;
-    int height;
-    float speed = 3200.0f; // pixels per second
+	// Stores the main vectors of the camera
+	glm::vec3 Position;
+	glm::vec3 Orientation = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 Up = glm::vec3(0.0f, 1.0f, 0.0f);
 
-    Camera(int width, int height, glm::vec2 position);
+	// Prevents the camera from jumping around when first clicking left click
+	bool firstClick = true;
 
-    void Matrix(Shader& shader, const char* uniform);
-    void Inputs(GLFWwindow* window, double deltaTime);
+	// Stores the width and height of the window
+	int width;
+	int height;
+	float aspectRatio;
+
+	// Adjust the speed of the camera and it's sensitivity when looking around
+	float speed = 0.1f;
+	float sensitivity = 100.0f;
+
+	// Camera constructor to set up initial values
+	Camera(int width, int height, glm::vec3 position);
+
+	// Updates and exports the camera matrix to the Vertex Shader
+	void Matrix(float FOVdeg, float nearPlane, float farPlane, Shader& shader, const char* uniform);
+	// Handles camera inputs
+	void Inputs(GLFWwindow* window, float deltaTime);
+
+	void SetViewportSize(int width, int height);
+	void SetAspectRatio(float aspectRatio);
 };
-
 #endif
